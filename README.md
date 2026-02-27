@@ -129,7 +129,7 @@ Add users via **Settings → Bot Users → Add User** (owner only).
 
 ## 🔌 RouterOS Version Matrix
 
-| Feature | ROS 6 (NSA) | ROS 7 (NSA) | ROS 7 (SA/Docker) |
+| Feature | ROS 6 | ROS 7 (NSA) | ROS 7 (SA/Docker) |
 |---|---|---|---|
 | All basic management | ✅ | ✅ | ✅ |
 | Firewall, DHCP, VPN | ✅ | ✅ | ✅ |
@@ -138,7 +138,7 @@ Add users via **Settings → Bot Users → Add User** (owner only).
 | Docker containers | ❌ | ✅ | ✅ |
 | IPv6 | Partial | ✅ | ✅ |
 | BGP/OSPF routing | ❌ | ✅ | ✅ |
-| Run inside router | ❌ | ✅ | ✅ |
+| Run inside router | ❌ | NSA | ✅ |
 
 ## 📡 Log Streaming
 
