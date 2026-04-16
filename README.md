@@ -7,7 +7,7 @@ Full RouterOS management bot. Every feature of WinBox, available in your Telegra
 | Category | Features |
 |---|---|
 | **System** | Resource monitoring, health, routerboard info, reboot, scheduler |
-| **Interfaces** | List, enable/disable, live traffic stats |
+| **Interfaces** | List, enable/disable, live traffic stats, ethernet statistics |
 | **Firewall** | Filter rules (CRUD, move, enable/disable), NAT, Mangle, Address Lists, Connection Tracking, Quick Block IP |
 | **DHCP** | Leases (view, make static, remove), servers, add static leases |
 | **Wireless** | Interface control, connected clients, SSID/password change, disconnect client, AP scan |
@@ -16,37 +16,59 @@ Full RouterOS management bot. Every feature of WinBox, available in your Telegra
 | **Logs** | View last N logs, filter by topic, **real-time streaming** |
 | **Routes** | View routing table (IPv4 + IPv6 on ROS7), add/remove static routes |
 | **DNS** | Settings, cache view, flush, change servers |
-| **Tools** | Ping, Traceroute, Bandwidth Test, Scripts (ROS7) |
+| **Tools** | Ping, Traceroute, Bandwidth Test, Scripts |
 | **Backup** | Create `.backup` file, export `.rsc` configuration |
+| **Queues** | Simple queue management (add/remove/enable/disable) |
+| **Hotspot** | User management, active sessions, kick users |
+| **Bridge/VLAN** | Bridge port management, VLAN create/delete |
 | **Containers** | Docker container management (ROS7 only) |
 | **RBAC** | owner / admin / operator / viewer roles with per-command permissions |
 | **Multi-router** | Multiple routers per user, switch between them |
 | **Alerts** | CPU/memory threshold alerts, interface down, new device detection |
 | **Auto-reconnect** | Watchdog reconnects dropped router connections |
+| **Security** | 🔐 Router passwords encrypted at rest (Fernet/PBKDF2) |
 
 ## 🗺 Architecture
 
 ```
 mikrobot/
-├── bot.py                    # Entry point
-├── config.py                 # Env-based config
+├── bot.py                     # Entry point
+├── config.py                  # Env-based config
+├── Dockerfile                 # Docker image
+├── docker-compose.yml         # One-command deploy
 ├── requirements.txt
 ├── core/
-│   ├── api_protocol.py       # RouterOS binary protocol (encode/decode + MD5 auth)
-│   ├── router_client.py      # Async TCP client with tag multiplexing + streaming
-│   ├── router_base.py        # Abstract interface (50+ methods)
-│   ├── router_ros6.py        # RouterOS 6 (NSA only)
-│   ├── router_ros7.py        # RouterOS 7 (NSA + SA/Docker) + WireGuard, Containers, IPv6
-│   ├── router_manager.py     # Multi-router registry with auto-detection
-│   ├── mock_router.py        # Full mock for offline development
-│   ├── monitor.py            # Background monitor + Telegram alerts
-│   ├── log_streamer.py       # Real-time log streaming to chat
-│   ├── watchdog.py           # Auto-reconnect watchdog
-│   ├── rbac.py               # Role-based access control
-│   └── session.py            # FSM user session state
+│   ├── api_protocol.py        # RouterOS binary protocol (encode/decode + MD5 auth)
+│   ├── router_client.py       # Async TCP client with tag multiplexing + streaming
+│   ├── router_base.py         # Abstract interface (50+ methods)
+│   ├── router_ros6.py         # RouterOS 6 (NSA only)
+│   ├── router_ros7.py         # RouterOS 7 (NSA + SA/Docker) + WireGuard, Containers, IPv6
+│   ├── router_manager.py      # Multi-router registry with auto-detection
+│   ├── crypto.py              # Fernet password encryption (BOT_TOKEN-derived key)
+│   ├── mock_router.py         # Full mock for offline development
+│   ├── monitor.py             # Background monitor + Telegram alerts
+│   ├── log_streamer.py        # Real-time log streaming to chat
+│   ├── watchdog.py            # Auto-reconnect watchdog
+│   ├── rbac.py                # Role-based access control
+│   └── session.py             # FSM user session state
 ├── handlers/
-│   ├── base.py               # Auth helpers
-│   └── callbacks.py          # All UI handlers (FSM + callbacks)
+│   ├── __init__.py            # Setup + register all sub-routers
+│   ├── base.py                # Auth helpers (send_or_edit, require_router)
+│   ├── context.py             # Shared state injection + auth middleware
+│   ├── commands.py            # /start, /help, /menu, /add_router
+│   ├── fsm.py                 # All FSM text-input wizards
+│   ├── system.py              # System info, health, reboot, scheduler, NTP, certs
+│   ├── interfaces.py          # Interface list/detail/traffic/toggle, eth stats
+│   ├── firewall.py            # Filter, NAT, mangle, address lists, add-rule wizard
+│   ├── dhcp.py                # Leases, servers, static lease add
+│   ├── wireless.py            # WiFi interfaces, clients, SSID/password, scan
+│   ├── vpn.py                 # PPPoE, L2TP, OpenVPN, PPP secrets, WireGuard
+│   ├── files.py               # File browser, download, delete
+│   ├── logs.py                # Log viewer, filter, real-time streaming
+│   ├── network.py             # Routes, DNS, IP addresses, ARP, pools
+│   ├── tools.py               # Ping, traceroute, bandwidth test, scripts
+│   ├── admin.py               # Settings, router/user management, containers
+│   └── extras.py              # Hotspot, bridge, VLAN, queues, backup
 └── ui/
     ├── keyboards.py           # All inline keyboards
     └── formatters.py          # Data formatters → Markdown text
@@ -65,13 +87,11 @@ MikroBot uses the **native RouterOS binary API** (port 8728 / SSL 8729):
 
 ## 🚀 Quick Start
 
-### 1. Install dependencies
+### Option 1: Run directly
 
 ```bash
 pip install -r requirements.txt
 ```
-
-### 2. Configure
 
 Create a `.env` file:
 
@@ -81,13 +101,22 @@ OWNER_ID=your_telegram_user_id   # optional, will auto-bootstrap on first /start
 LOG_LEVEL=INFO
 ```
 
-### 3. Run
-
 ```bash
 python bot.py
 ```
 
-### 4. First use
+### Option 2: Docker (recommended)
+
+```bash
+cp .env.example .env
+# Edit .env with your BOT_TOKEN
+
+docker compose up -d
+```
+
+That's it. Logs: `docker compose logs -f`
+
+### First use
 
 1. Send `/start` to your bot
 2. You'll be auto-promoted to **owner** (first user)
@@ -106,8 +135,6 @@ MIKROTIK_USER=admin
 MIKROTIK_PASS=your_password
 ```
 
-The bot will auto-connect to the host router on startup via the Docker bridge interface.
-
 **RouterOS 7 Docker setup:**
 
 ```routeros
@@ -115,6 +142,13 @@ The bot will auto-connect to the host router on startup via the Docker bridge in
 add remote-image=python:3.12-alpine interface=veth1 root-dir=disk1/mikrobot \
     cmd="python /app/bot.py" envlist=mikrobot-env
 ```
+
+## 🔐 Security
+
+- **Passwords encrypted at rest** — `data/routers.json` uses Fernet symmetric encryption with a key derived from your `BOT_TOKEN` via PBKDF2 (100k iterations). Without the token, the file is useless.
+- **Auto-migration** — existing plaintext passwords are encrypted automatically on first save.
+- **Password message deletion** — when adding a router, the message containing your password is deleted from chat.
+- **RBAC** — per-action permission checks prevent unauthorized access to destructive operations.
 
 ## 👥 RBAC Roles
 
@@ -137,7 +171,6 @@ Add users via **Settings → Bot Users → Add User** (owner only).
 | WireGuard | ❌ | ✅ | ✅ |
 | Docker containers | ❌ | ✅ | ✅ |
 | IPv6 | Partial | ✅ | ✅ |
-| BGP/OSPF routing | ❌ | ✅ | ✅ |
 | Run inside router | ❌ | NSA | ✅ |
 
 ## 📡 Log Streaming

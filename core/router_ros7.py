@@ -231,13 +231,7 @@ class RouterROS7(RouterROS6):
         except APIError:
             return []
 
-    # ─── IPv6 ─────────────────────────────────────────────────────────────────
-
-    async def get_ipv6_addresses(self) -> list[dict]:
-        try:
-            return await self._client.command("/ipv6/address/print")
-        except APIError:
-            return []
+    # ─── IPv6 (extended) ──────────────────────────────────────────────────────
 
     async def get_ipv6_firewall_filter(self) -> list[dict]:
         try:
@@ -245,14 +239,7 @@ class RouterROS7(RouterROS6):
         except APIError:
             return []
 
-    async def get_ipv6_neighbors(self) -> list[dict]:
-        """IPv6 neighbor discovery table (equivalent of ARP for IPv6)."""
-        try:
-            return await self._client.command("/ipv6/neighbor/print")
-        except APIError:
-            return []
-
-    # ─── BGP / OSPF (ROS7 routing) ───────────────────────────────────────────
+    # ─── BGP (ROS7 routing — extended) ────────────────────────────────────────
 
     async def get_bgp_connections(self) -> list[dict]:
         try:
@@ -260,19 +247,7 @@ class RouterROS7(RouterROS6):
         except APIError:
             return []
 
-    async def get_ospf_instances(self) -> list[dict]:
-        try:
-            return await self._client.command("/routing/ospf/instance/print")
-        except APIError:
-            return []
-
-    # ─── Certificate Manager ─────────────────────────────────────────────────
-
-    async def get_certificates(self) -> list[dict]:
-        try:
-            return await self._client.command("/certificate/print")
-        except APIError:
-            return []
+    # ─── Certificate Manager (ROS7 extended) ──────────────────────────────────
 
     async def generate_self_signed_cert(self, common_name: str, days: int = 3650) -> str:
         """
@@ -300,22 +275,10 @@ class RouterROS7(RouterROS6):
         except APIError:
             return []
 
-    async def get_bridge_ports(self) -> list[dict]:
-        try:
-            return await self._client.command("/interface/bridge/port/print")
-        except APIError:
-            return []
-
-    # ─── Scheduler / Scripts ─────────────────────────────────────────────────
+    # ─── Scheduler ────────────────────────────────────────────────────────────
 
     async def get_scheduler_entries(self) -> list[dict]:
         return await self._client.command("/system/scheduler/print")
-
-    async def get_scripts(self) -> list[dict]:
-        return await self._client.command("/system/script/print")
-
-    async def run_script(self, name: str):
-        await self._client.command("/system/script/run", {"number": name})
 
     # ─── WiFi (wifi-qcom / wifiwave2 — ROS7 new wireless package) ────────────
 

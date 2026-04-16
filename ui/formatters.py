@@ -4,6 +4,7 @@ All output is Markdown-safe.
 """
 
 from datetime import datetime
+from core.log_streamer import TOPIC_EMOJI
 
 
 def _safe(v) -> str:
@@ -350,13 +351,6 @@ def fmt_vpn_secret(secret: dict) -> str:
 
 
 # ─── Logs ─────────────────────────────────────────────────────────────────────
-
-TOPIC_EMOJI = {
-    "error": "🔴", "critical": "🆘", "warning": "🟡",
-    "info": "🔵", "debug": "⚪", "firewall": "🛡",
-    "dhcp": "📡", "wireless": "📶", "system": "⚙️",
-    "script": "📜", "pppoe": "🔗", "account": "👤",
-}
 
 
 def fmt_logs(entries: list[dict]) -> str:

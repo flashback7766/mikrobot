@@ -10,7 +10,8 @@ Entry point. Run with: python bot.py
 
 import asyncio
 import logging
-import os
+import signal
+from datetime import datetime
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher
@@ -18,13 +19,14 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from config import BOT_TOKEN, LOG_LEVEL, OWNER_ID
+from core import crypto
 from core.router_manager import RouterManager
-from core.rbac import RBACManager, Role
+from core.rbac import RBACManager
 from core.session import SessionManager
 from core.monitor import Monitor
 from core.watchdog import Watchdog
-import handlers.callbacks as cb_handlers
-from handlers.callbacks import router as main_router
+from core.healthcheck import HealthServer
+import handlers
 
 # ─── Logging ─────────────────────────────────────────────────────────────────
 
@@ -39,6 +41,10 @@ log = logging.getLogger("MikroBot")
 
 Path("data").mkdir(exist_ok=True)
 
+# ─── Crypto (must init before RouterManager loads passwords) ──────────────────
+
+crypto.init(BOT_TOKEN)
+
 # ─── Core Components ─────────────────────────────────────────────────────────
 
 rm = RouterManager()
@@ -46,12 +52,24 @@ rbac = RBACManager()
 sessions = SessionManager()
 
 
+# ─── Startup / Shutdown Notifications ─────────────────────────────────────────
+
+async def _notify_owner(bot: Bot, text: str):
+    """Send a notification to the bot owner (if configured)."""
+    if not OWNER_ID:
+        return
+    try:
+        await bot.send_message(OWNER_ID, text, parse_mode="Markdown")
+    except Exception as e:
+        log.warning(f"Could not notify owner: {e}")
+
+
 async def main():
     log.info("Starting MikroBot…")
 
     # Bootstrap owner from config if set and not yet registered
     if OWNER_ID and not rbac.is_bootstrapped():
-        rbac.bootstrap_owner(OWNER_ID)
+        await rbac.bootstrap_owner(OWNER_ID)
         log.info(f"Owner bootstrapped: {OWNER_ID}")
 
     bot = Bot(
@@ -59,24 +77,40 @@ async def main():
         default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN),
     )
 
-    # Inject dependencies into handler module
-    cb_handlers.setup(rm, rbac, sessions, bot)
+    # Inject dependencies and wire all handler sub-routers
+    handlers.setup(rm, rbac, sessions, bot)
 
     dp = Dispatcher()
-    dp.include_router(main_router)
+    dp.include_router(handlers.parent_router)
 
     # Start background services
     monitor = Monitor(rm, bot, OWNER_ID or 0)
+    rm._monitor = monitor  # Wire cleanup hook
     watchdog = Watchdog(rm)
     await monitor.start()
     await watchdog.start()
+
+    # Start HTTP healthcheck server (port 8080)
+    health = HealthServer(rm, sessions, port=8080)
+    await health.start()
+
+    # Start session auto-cleanup (expires stale FSM states)
+    await sessions.start_cleanup_loop()
+
+    # Notify owner that bot is online
+    now = datetime.now().strftime("%H:%M:%S %d.%m.%Y")
+    await _notify_owner(bot, f"🟢 *MikroBot Online*\n`{now}`")
 
     log.info("Bot is running. Press Ctrl+C to stop.")
     try:
         await dp.start_polling(bot, allowed_updates=["message", "callback_query"])
     finally:
+        log.info("Shutting down…")
+        await _notify_owner(bot, "🔴 *MikroBot shutting down…*")
+        await sessions.stop_cleanup_loop()
         await monitor.stop()
         await watchdog.stop()
+        await health.stop()
         await bot.session.close()
 
 

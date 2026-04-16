@@ -1,10 +1,28 @@
 """
 Keyboard builder – all inline keyboards for the bot UI.
 Uses aiogram 3.x InlineKeyboardBuilder.
+
+Menu structure:
+  Main Menu
+  ├── 📊 System          → info, health, reboot, scheduler, NTP, certs, users
+  ├── 🔌 Interfaces      → list, traffic, toggle, eth stats
+  ├── 🛡 Firewall        → filter, NAT, mangle, addr lists, connections, block IP
+  ├── 📡 DHCP            → leases, servers, static leases
+  ├── 📶 Wireless        → APs, clients, SSID/pass, scan
+  ├── 🔒 VPN             → PPPoE, L2TP, OpenVPN, PPP secrets, WireGuard
+  ├── 🌐 Network         → routes, DNS, IP addresses, ARP, pools, VLANs
+  ├── 📋 Logs            → view, filter, stream
+  ├── 🔧 Tools           → ping, traceroute, bwtest, scripts, search, quality
+  ├── 📦 Backup          → create backup, export config, view files
+  ├── 📊 QoS / Queues    → queue list, add, enable/disable
+  ├── 🌉 Extras          → hotspot, bridge, containers
+  └── ⚙️ Settings        → routers, users, language, bot info
 """
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from ui.formatters import _fmt_bytes
 
 
 def _kb(*rows: list[tuple[str, str]]) -> InlineKeyboardMarkup:
@@ -15,12 +33,17 @@ def _kb(*rows: list[tuple[str, str]]) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def _back(cb: str, label: str = "⬅️ Back") -> list[tuple[str, str]]:
+    return [(label, cb)]
+
+
 # ─── Language Selection ───────────────────────────────────────────────────────
 
 def lang_keyboard() -> InlineKeyboardMarkup:
     return _kb(
         [("🇬🇧 English", "lang:en"), ("🇷🇺 Русский", "lang:ru")],
         [("🇦🇲 Հայերեն", "lang:am"), ("🇩🇪 Deutsch", "lang:de")],
+        _back("menu:settings"),
     )
 
 
@@ -28,15 +51,13 @@ def lang_keyboard() -> InlineKeyboardMarkup:
 
 def main_menu() -> InlineKeyboardMarkup:
     return _kb(
-        [("📊 System", "menu:system"), ("🔌 Interfaces", "menu:interfaces")],
-        [("🛡 Firewall", "menu:firewall"), ("📡 DHCP", "menu:dhcp")],
-        [("📶 Wireless", "menu:wireless"), ("🔒 VPN", "menu:vpn")],
-        [("📁 Files", "menu:files"), ("📋 Logs", "menu:logs")],
-        [("🗺 Routes", "menu:routes"), ("🌐 DNS", "menu:dns")],
-        [("🔧 Tools", "menu:tools"), ("⚙️ Settings", "menu:settings")],
-        [("📦 Backup", "menu:backup"), ("🌐 IP Mgmt", "menu:ip")],
-        [("📊 Queues", "menu:queues"), ("🔥 Hotspot", "menu:hotspot")],
-        [("📜 Scripts", "menu:scripts"), ("🌉 Bridge/VLAN", "menu:bridge")],
+        [("📊 System", "menu:system"),       ("🔌 Interfaces", "menu:interfaces")],
+        [("🛡 Firewall", "menu:firewall"),   ("📡 DHCP", "menu:dhcp")],
+        [("📶 Wireless", "menu:wireless"),   ("🔒 VPN", "menu:vpn")],
+        [("🌐 Network", "menu:network"),     ("📋 Logs", "menu:logs")],
+        [("🔧 Tools", "menu:tools"),         ("📦 Backup", "menu:backup")],
+        [("📊 QoS / Queues", "menu:queues"), ("🌉 Extras", "menu:extras")],
+        [("⚙️ Settings", "menu:settings")],
     )
 
 
@@ -44,17 +65,18 @@ def main_menu() -> InlineKeyboardMarkup:
 
 def system_menu() -> InlineKeyboardMarkup:
     return _kb(
-        [("🔄 Refresh", "sys:refresh"), ("🌡 Health", "sys:health")],
-        [("📋 Routerboard", "sys:routerboard"), ("👤 Users", "sys:users")],
-        [("🔁 Reboot", "sys:reboot"), ("📅 Scheduler", "sys:scheduler")],
-        [("🕐 NTP", "sys:ntp"), ("🔐 Certs", "sys:certs")],
-        [("← Back", "menu:main")],
+        [("📊 Info", "sys:refresh"),          ("🌡 Health", "sys:health")],
+        [("📉 Health Card", "qol:health_card"), ("🔌 Conn Detail", "qol:conn_detail")],
+        [("📋 Routerboard", "sys:routerboard"), ("👤 Router Users", "sys:users")],
+        [("🔁 Reboot", "sys:reboot"),          ("📅 Scheduler", "sys:scheduler")],
+        [("🕐 NTP", "sys:ntp"),               ("🔐 Certificates", "sys:certs")],
+        _back("menu:main"),
     )
 
 
 def reboot_confirm() -> InlineKeyboardMarkup:
     return _kb(
-        [("✅ Yes, reboot!", "sys:reboot_confirm"), ("❌ Cancel", "sys:refresh")],
+        [("✅ Yes, Reboot!", "sys:reboot_confirm"), ("❌ Cancel", "sys:refresh")],
     )
 
 
@@ -71,9 +93,10 @@ def interfaces_menu(interfaces: list[dict]) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text=f"{icon} {name}", callback_data=f"iface:detail:{name}"),
         )
     builder.row(
+        InlineKeyboardButton(text="📈 Eth Stats", callback_data="iface:eth_stats"),
         InlineKeyboardButton(text="🔄 Refresh", callback_data="menu:interfaces"),
-        InlineKeyboardButton(text="← Back", callback_data="menu:main"),
     )
+    builder.row(InlineKeyboardButton(text="⬅️ Back", callback_data="menu:main"))
     return builder.as_markup()
 
 
@@ -82,7 +105,7 @@ def interface_detail_menu(name: str, running: bool, disabled: bool) -> InlineKey
     toggle_cb = f"iface:disable:{name}" if not disabled else f"iface:enable:{name}"
     return _kb(
         [("📊 Traffic", f"iface:traffic:{name}"), (toggle_text, toggle_cb)],
-        [("← Back", "menu:interfaces")],
+        _back("menu:interfaces"),
     )
 
 
@@ -90,10 +113,12 @@ def interface_detail_menu(name: str, running: bool, disabled: bool) -> InlineKey
 
 def firewall_menu() -> InlineKeyboardMarkup:
     return _kb(
-        [("🔍 Filter Rules", "fw:filter"), ("🔀 NAT Rules", "fw:nat")],
-        [("✏️ Mangle", "fw:mangle"), ("📋 Address Lists", "fw:addrlist")],
-        [("🔗 Connections", "fw:connections"), ("➕ Add Rule", "fw:add_rule")],
-        [("🚫 Quick Block IP", "fw:block_ip"), ("← Back", "menu:main")],
+        [("🔍 Filter Rules", "fw:filter"),    ("🔀 NAT Rules", "fw:nat")],
+        [("✏️ Mangle Rules", "fw:mangle"),    ("📋 Address Lists", "fw:addrlist")],
+        [("🔗 Connections", "fw:connections"), ("🚫 Quick Block IP", "fw:block_ip")],
+        [("➕ Add Filter Rule", "fw:add_rule"), ("➕ Add NAT Rule", "nat:add_prompt")],
+        [("⚠️ Disable All Rules", "qol:bulk_disable_fw")],
+        _back("menu:main"),
     )
 
 
@@ -120,7 +145,6 @@ def firewall_rule_list(rules: list[dict], page: int = 0, per_page: int = 5) -> I
             label += f" ({comment[:15]})"
         builder.row(InlineKeyboardButton(text=label[:50], callback_data=f"fw:rule:{id_}"))
 
-    # Pagination
     nav = []
     if page > 0:
         nav.append(InlineKeyboardButton(text="⬅️", callback_data=f"fw:filter:page:{page-1}"))
@@ -131,7 +155,7 @@ def firewall_rule_list(rules: list[dict], page: int = 0, per_page: int = 5) -> I
 
     builder.row(
         InlineKeyboardButton(text="➕ Add", callback_data="fw:add_rule"),
-        InlineKeyboardButton(text="← Back", callback_data="menu:firewall"),
+        InlineKeyboardButton(text="⬅️ Back", callback_data="menu:firewall"),
     )
     return builder.as_markup()
 
@@ -142,7 +166,7 @@ def firewall_rule_detail(id_: str, disabled: bool) -> InlineKeyboardMarkup:
     return _kb(
         [(toggle_text, toggle_cb), ("🗑 Remove", f"fw:remove:{id_}")],
         [("⬆️ Move Up", f"fw:move_up:{id_}"), ("⬇️ Move Down", f"fw:move_down:{id_}")],
-        [("← Back", "fw:filter")],
+        _back("fw:filter"),
     )
 
 
@@ -176,7 +200,7 @@ def address_list_menu(lists: list[str]) -> InlineKeyboardMarkup:
     for list_name in lists:
         builder.row(InlineKeyboardButton(text=f"📋 {list_name}", callback_data=f"fw:addrlist:view:{list_name}"))
     builder.row(InlineKeyboardButton(text="➕ Add Entry", callback_data="fw:addrlist:add"))
-    builder.row(InlineKeyboardButton(text="← Back", callback_data="menu:firewall"))
+    builder.row(InlineKeyboardButton(text="⬅️ Back", callback_data="menu:firewall"))
     return builder.as_markup()
 
 
@@ -184,9 +208,9 @@ def address_list_menu(lists: list[str]) -> InlineKeyboardMarkup:
 
 def dhcp_menu() -> InlineKeyboardMarkup:
     return _kb(
-        [("📋 Leases", "dhcp:leases"), ("🖥 Servers", "dhcp:servers")],
+        [("📋 Leases", "dhcp:leases"),    ("🖥 Servers", "dhcp:servers")],
         [("➕ Add Static Lease", "dhcp:add_static")],
-        [("← Back", "menu:main")],
+        _back("menu:main"),
     )
 
 
@@ -211,7 +235,10 @@ def dhcp_lease_list(leases: list[dict], page: int = 0, per_page: int = 6) -> Inl
     if nav:
         builder.row(*nav)
 
-    builder.row(InlineKeyboardButton(text="← Back", callback_data="menu:dhcp"))
+    builder.row(
+        InlineKeyboardButton(text="➕ Add Static", callback_data="dhcp:add_static"),
+        InlineKeyboardButton(text="⬅️ Back", callback_data="menu:dhcp"),
+    )
     return builder.as_markup()
 
 
@@ -219,7 +246,7 @@ def dhcp_lease_detail(id_: str, is_dynamic: bool) -> InlineKeyboardMarkup:
     rows = []
     if is_dynamic:
         rows.append([("📌 Make Static", f"dhcp:make_static:{id_}")])
-    rows.append([("🗑 Remove", f"dhcp:remove:{id_}"), ("← Back", "dhcp:leases")])
+    rows.append([("🗑 Remove", f"dhcp:remove:{id_}"), ("⬅️ Back", "dhcp:leases")])
     return _kb(*rows)
 
 
@@ -236,8 +263,11 @@ def wireless_menu(interfaces: list[dict]) -> InlineKeyboardMarkup:
             text=f"{icon} {name} ({ssid})",
             callback_data=f"wifi:iface:{name}",
         ))
-    builder.row(InlineKeyboardButton(text="👥 Clients", callback_data="wifi:clients"))
-    builder.row(InlineKeyboardButton(text="← Back", callback_data="menu:main"))
+    builder.row(
+        InlineKeyboardButton(text="👥 Clients", callback_data="wifi:clients"),
+        InlineKeyboardButton(text="🔄 Refresh", callback_data="menu:wireless"),
+    )
+    builder.row(InlineKeyboardButton(text="⬅️ Back", callback_data="menu:main"))
     return builder.as_markup()
 
 
@@ -246,7 +276,7 @@ def wireless_iface_menu(name: str, disabled: bool) -> InlineKeyboardMarkup:
     return _kb(
         [("✏️ Change SSID", f"wifi:set_ssid:{name}"), ("🔑 Change Password", f"wifi:set_pass:{name}")],
         [toggle, ("📡 Scan APs", f"wifi:scan:{name}")],
-        [("← Back", "menu:wireless")],
+        _back("menu:wireless"),
     )
 
 
@@ -259,14 +289,14 @@ def wireless_clients_menu(clients: list[dict]) -> InlineKeyboardMarkup:
         comment = client.get("comment", "")
         label = f"📱 {comment or mac[:11]} {signal} [{iface}]"
         builder.row(InlineKeyboardButton(text=label[:50], callback_data=f"wifi:client:{mac}"))
-    builder.row(InlineKeyboardButton(text="← Back", callback_data="menu:wireless"))
+    builder.row(InlineKeyboardButton(text="⬅️ Back", callback_data="menu:wireless"))
     return builder.as_markup()
 
 
 def wireless_client_detail(mac: str) -> InlineKeyboardMarkup:
     return _kb(
         [("🚫 Disconnect", f"wifi:disconnect:{mac}")],
-        [("← Back", "wifi:clients")],
+        _back("wifi:clients"),
     )
 
 
@@ -274,10 +304,11 @@ def wireless_client_detail(mac: str) -> InlineKeyboardMarkup:
 
 def vpn_menu() -> InlineKeyboardMarkup:
     return _kb(
-        [("📋 PPPoE Active", "vpn:pppoe"), ("👤 PPP Secrets", "vpn:secrets")],
-        [("🔒 L2TP Server", "vpn:l2tp"), ("🔑 OpenVPN", "vpn:ovpn")],
-        [("🔗 WireGuard", "vpn:wg"), ("➕ Add Secret", "vpn:add_secret")],
-        [("📋 PPP Profiles", "vpn:profiles"), ("← Back", "menu:main")],
+        [("📋 PPPoE Active",   "vpn:pppoe"),    ("👤 PPP Secrets",  "vpn:secrets")],
+        [("🔒 L2TP Server",    "vpn:l2tp"),     ("🔑 OpenVPN",      "vpn:ovpn")],
+        [("🔗 WireGuard",      "vpn:wg"),       ("📋 PPP Profiles", "vpn:profiles")],
+        [("➕ Add VPN User",   "vpn:add_secret")],
+        _back("menu:main"),
     )
 
 
@@ -299,13 +330,17 @@ def vpn_secrets_list(secrets: list[dict], page: int = 0, per_page: int = 6) -> I
         nav.append(InlineKeyboardButton(text="➡️", callback_data=f"vpn:secrets:page:{page+1}"))
     if nav:
         builder.row(*nav)
-    builder.row(InlineKeyboardButton(text="← Back", callback_data="menu:vpn"))
+    builder.row(
+        InlineKeyboardButton(text="➕ Add", callback_data="vpn:add_secret"),
+        InlineKeyboardButton(text="⬅️ Back", callback_data="menu:vpn"),
+    )
     return builder.as_markup()
 
 
 def vpn_secret_detail(id_: str) -> InlineKeyboardMarkup:
     return _kb(
-        [("🗑 Remove", f"vpn:secret:remove:{id_}"), ("← Back", "vpn:secrets")],
+        [("🗑 Remove", f"vpn:secret:remove:{id_}")],
+        _back("vpn:secrets"),
     )
 
 
@@ -313,16 +348,16 @@ def vpn_secret_detail(id_: str) -> InlineKeyboardMarkup:
 
 def files_menu(files: list[dict]) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    for f in files[:15]:  # Limit display
+    for f in files[:15]:
         name = f.get("name", "?")
         size = f.get("size", "0")
         type_ = f.get("type", "")
         icon = {"backup": "💾", "script": "📜", "package": "📦"}.get(type_, "📄")
-        label = f"{icon} {name} ({_fmt_size(int(size))})"
+        label = f"{icon} {name} ({_fmt_bytes(int(size))})"
         builder.row(InlineKeyboardButton(text=label[:50], callback_data=f"file:detail:{name}"))
     builder.row(
         InlineKeyboardButton(text="🔄 Refresh", callback_data="menu:files"),
-        InlineKeyboardButton(text="← Back", callback_data="menu:main"),
+        InlineKeyboardButton(text="⬅️ Back", callback_data="menu:backup"),
     )
     return builder.as_markup()
 
@@ -330,7 +365,7 @@ def files_menu(files: list[dict]) -> InlineKeyboardMarkup:
 def file_detail_menu(name: str) -> InlineKeyboardMarkup:
     return _kb(
         [("⬇️ Download", f"file:download:{name}"), ("🗑 Delete", f"file:delete:{name}")],
-        [("← Back", "menu:files")],
+        _back("menu:files"),
     )
 
 
@@ -338,10 +373,11 @@ def file_detail_menu(name: str) -> InlineKeyboardMarkup:
 
 def logs_menu() -> InlineKeyboardMarkup:
     return _kb(
-        [("📋 Last 50 Logs", "log:last50"), ("📋 Last 20 Logs", "log:last20")],
-        [("🔍 Firewall Logs", "log:filter:firewall"), ("⚠️ Error Logs", "log:filter:error")],
-        [("📡 Stream Logs", "log:stream"), ("📡 Stream Firewall", "log:stream:firewall")],
-        [("← Back", "menu:main")],
+        [("📋 Last 20", "log:last20"),              ("📋 Last 50", "log:last50")],
+        [("🔥 Firewall Logs", "log:filter:firewall"), ("⚠️ Error Logs", "log:filter:error")],
+        [("⚙️ System Logs", "log:filter:system"),    ("📡 DHCP Logs", "log:filter:dhcp")],
+        [("📡 Stream All", "log:stream"),            ("📡 Stream Firewall", "log:stream:firewall")],
+        _back("menu:main"),
     )
 
 
@@ -349,7 +385,16 @@ def log_stream_stop() -> InlineKeyboardMarkup:
     return _kb([("🔴 Stop Stream", "log:stop")])
 
 
-# ─── Routes Menu ──────────────────────────────────────────────────────────────
+# ─── Network Menu (Routes / DNS / IP) ─────────────────────────────────────────
+
+def network_menu() -> InlineKeyboardMarkup:
+    return _kb(
+        [("🗺 Routes",       "menu:routes"),   ("🌐 DNS",         "menu:dns")],
+        [("📍 IP Addresses", "ip:list"),       ("🔁 ARP Table",   "ip:arp")],
+        [("🏊 IP Pools",     "ip:pools"),      ("🏷 VLANs",       "vlan:list")],
+        _back("menu:main"),
+    )
+
 
 def routes_menu(routes: list[dict]) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
@@ -363,24 +408,80 @@ def routes_menu(routes: list[dict]) -> InlineKeyboardMarkup:
             text=f"{icon} {dst} → {gw}",
             callback_data=f"route:detail:{id_}",
         ))
-    builder.row(InlineKeyboardButton(text="➕ Add Route", callback_data="route:add"))
-    builder.row(InlineKeyboardButton(text="← Back", callback_data="menu:main"))
+    builder.row(
+        InlineKeyboardButton(text="➕ Add Route", callback_data="route:add"),
+        InlineKeyboardButton(text="🔄 Refresh", callback_data="menu:routes"),
+    )
+    builder.row(InlineKeyboardButton(text="⬅️ Back", callback_data="menu:network"))
     return builder.as_markup()
 
 
 def route_detail_menu(id_: str) -> InlineKeyboardMarkup:
     return _kb(
-        [("🗑 Remove", f"route:remove:{id_}"), ("← Back", "menu:routes")],
+        [("🗑 Remove", f"route:remove:{id_}")],
+        _back("menu:routes"),
     )
 
 
-# ─── DNS Menu ─────────────────────────────────────────────────────────────────
-
 def dns_menu() -> InlineKeyboardMarkup:
     return _kb(
-        [("⚙️ Settings", "dns:settings"), ("📋 Cache", "dns:cache")],
-        [("🗑 Flush Cache", "dns:flush"), ("✏️ Set Servers", "dns:set_servers")],
-        [("← Back", "menu:main")],
+        [("⚙️ DNS Settings", "dns:settings"), ("📋 DNS Cache",    "dns:cache")],
+        [("✏️ Set Servers",  "dns:set_servers"), ("🗑 Flush Cache", "dns:flush")],
+        _back("menu:network"),
+    )
+
+
+def ip_menu() -> InlineKeyboardMarkup:
+    """Legacy alias → redirects to network_menu."""
+    return network_menu()
+
+
+def ip_address_list_menu(addresses: list[dict]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for a in addresses:
+        addr = a.get("address", "?")
+        iface = a.get("interface", "?")
+        id_ = a.get(".id", "")
+        builder.row(InlineKeyboardButton(
+            text=f"📍 {addr} [{iface}]",
+            callback_data=f"ip:addr:detail:{id_}",
+        ))
+    builder.row(
+        InlineKeyboardButton(text="➕ Add", callback_data="ip:add_prompt"),
+        InlineKeyboardButton(text="🔄 Refresh", callback_data="ip:list"),
+        InlineKeyboardButton(text="⬅️ Back", callback_data="menu:network"),
+    )
+    return builder.as_markup()
+
+
+def ip_addr_detail_menu(id_: str) -> InlineKeyboardMarkup:
+    return _kb(
+        [("🗑 Remove", f"ip:remove:{id_}")],
+        _back("ip:list"),
+    )
+
+
+def ip_pools_menu(pools: list[dict]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for p in pools:
+        name = p.get("name", "?")
+        ranges = p.get("ranges", "?")
+        id_ = p.get(".id", "")
+        builder.row(InlineKeyboardButton(
+            text=f"🏊 {name} ({ranges})",
+            callback_data=f"ip:pool:detail:{id_}",
+        ))
+    builder.row(
+        InlineKeyboardButton(text="➕ Add Pool", callback_data="ip:pool:add_prompt"),
+        InlineKeyboardButton(text="⬅️ Back", callback_data="menu:network"),
+    )
+    return builder.as_markup()
+
+
+def ip_pool_detail_menu(id_: str) -> InlineKeyboardMarkup:
+    return _kb(
+        [("🗑 Remove", f"ip:pool:remove:{id_}")],
+        _back("ip:pools"),
     )
 
 
@@ -388,9 +489,10 @@ def dns_menu() -> InlineKeyboardMarkup:
 
 def tools_menu() -> InlineKeyboardMarkup:
     return _kb(
-        [("🏓 Ping", "tool:ping"), ("🗺 Traceroute", "tool:traceroute")],
-        [("📊 Bandwidth Test", "tool:bwtest"), ("📜 Scripts", "tool:scripts")],
-        [("← Back", "menu:main")],
+        [("🏓 Ping",           "tool:ping"),       ("🗺 Traceroute",    "tool:traceroute")],
+        [("📊 Bandwidth Test", "tool:bwtest"),     ("📜 Scripts",       "tool:scripts")],
+        [("🔍 Search (find)",  "qol:find"),        ("📡 Conn Quality",  "qol:quality")],
+        _back("menu:main"),
     )
 
 
@@ -399,8 +501,165 @@ def tools_menu() -> InlineKeyboardMarkup:
 def backup_menu() -> InlineKeyboardMarkup:
     return _kb(
         [("💾 Create Backup", "backup:create"), ("📜 Export Config", "backup:export")],
-        [("📋 View Files", "menu:files")],
-        [("← Back", "menu:main")],
+        [("📁 View Files",    "menu:files")],
+        _back("menu:main"),
+    )
+
+
+# ─── QoS / Queues Menu ────────────────────────────────────────────────────────
+
+def queues_menu(queues: list[dict]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for q in queues:
+        name = q.get("name", "?")
+        target = q.get("target", "?")
+        max_limit = q.get("max-limit", "")
+        id_ = q.get(".id", "")
+        disabled = q.get("disabled", "false") == "true"
+        icon = "⛔" if disabled else "🟢"
+        label = f"{icon} {name} → {target}"
+        if max_limit:
+            label += f" [{max_limit}]"
+        builder.row(InlineKeyboardButton(text=label[:50], callback_data=f"queue:detail:{id_}"))
+    builder.row(
+        InlineKeyboardButton(text="➕ Add Queue", callback_data="queue:add_prompt"),
+        InlineKeyboardButton(text="🔄 Refresh", callback_data="menu:queues"),
+    )
+    builder.row(InlineKeyboardButton(text="⬅️ Back", callback_data="menu:main"))
+    return builder.as_markup()
+
+
+def queue_detail_menu(id_: str, disabled: bool) -> InlineKeyboardMarkup:
+    toggle = ("✅ Enable", f"queue:enable:{id_}") if disabled else ("⛔ Disable", f"queue:disable:{id_}")
+    return _kb(
+        [toggle, ("🗑 Remove", f"queue:remove:{id_}")],
+        _back("menu:queues"),
+    )
+
+
+# ─── Extras Menu (Hotspot, Bridge, Containers) ───────────────────────────────
+
+def extras_menu() -> InlineKeyboardMarkup:
+    return _kb(
+        [("🔥 Hotspot",    "menu:hotspot"),  ("🌉 Bridge/VLAN", "menu:bridge")],
+        [("🐋 Containers", "container:list")],
+        _back("menu:main"),
+    )
+
+
+def hotspot_menu() -> InlineKeyboardMarkup:
+    return _kb(
+        [("👥 Hotspot Users",    "hotspot:users"),      ("🟢 Active Sessions", "hotspot:active")],
+        [("➕ Add Hotspot User", "hotspot:add_prompt")],
+        _back("menu:extras"),
+    )
+
+
+def hotspot_users_menu(users: list[dict]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for u in users:
+        name = u.get("name", "?")
+        id_ = u.get(".id", "")
+        profile = u.get("profile", "default")
+        builder.row(InlineKeyboardButton(
+            text=f"👤 {name} [{profile}]",
+            callback_data=f"hotspot:user:{id_}",
+        ))
+    builder.row(
+        InlineKeyboardButton(text="➕ Add User", callback_data="hotspot:add_prompt"),
+        InlineKeyboardButton(text="⬅️ Back", callback_data="menu:hotspot"),
+    )
+    return builder.as_markup()
+
+
+def hotspot_user_detail_menu(id_: str) -> InlineKeyboardMarkup:
+    return _kb(
+        [("🗑 Remove", f"hotspot:remove:{id_}")],
+        _back("hotspot:users"),
+    )
+
+
+def hotspot_active_menu(sessions: list[dict]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for s in sessions:
+        name = s.get("user", "?")
+        ip = s.get("address", "?")
+        id_ = s.get(".id", "")
+        builder.row(InlineKeyboardButton(
+            text=f"🟢 {name} ({ip})",
+            callback_data=f"hotspot:kick:{id_}",
+        ))
+    builder.row(InlineKeyboardButton(text="⬅️ Back", callback_data="menu:hotspot"))
+    return builder.as_markup()
+
+
+def bridge_menu(bridges: list[dict]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for b in bridges:
+        name = b.get("name", "?")
+        running = b.get("running", "false") == "true"
+        icon = "🟢" if running else "🔴"
+        builder.row(InlineKeyboardButton(
+            text=f"{icon} Bridge: {name}",
+            callback_data=f"bridge:detail:{name}",
+        ))
+    builder.row(
+        InlineKeyboardButton(text="🏷 VLANs", callback_data="vlan:list"),
+        InlineKeyboardButton(text="⬅️ Back", callback_data="menu:extras"),
+    )
+    return builder.as_markup()
+
+
+def bridge_detail_menu(name: str) -> InlineKeyboardMarkup:
+    return _kb(
+        [("🔌 Ports", f"bridge:ports:{name}")],
+        _back("menu:bridge"),
+    )
+
+
+def vlan_list_menu(vlans: list[dict]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for v in vlans:
+        name = v.get("name", "?")
+        vid = v.get("vlan-id", "?")
+        iface = v.get("interface", "?")
+        id_ = v.get(".id", "")
+        builder.row(InlineKeyboardButton(
+            text=f"🏷 VLAN {vid}: {name} [{iface}]",
+            callback_data=f"vlan:detail:{id_}",
+        ))
+    builder.row(
+        InlineKeyboardButton(text="➕ Add VLAN", callback_data="vlan:add_prompt"),
+        InlineKeyboardButton(text="⬅️ Back", callback_data="menu:bridge"),
+    )
+    return builder.as_markup()
+
+
+def vlan_detail_menu(id_: str) -> InlineKeyboardMarkup:
+    return _kb(
+        [("🗑 Remove", f"vlan:remove:{id_}")],
+        _back("vlan:list"),
+    )
+
+
+# ─── Scripts Menu ─────────────────────────────────────────────────────────────
+
+def scripts_menu(scripts: list[dict]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for s in scripts:
+        name = s.get("name", "?")
+        builder.row(InlineKeyboardButton(
+            text=f"📜 {name}",
+            callback_data=f"script:detail:{name}",
+        ))
+    builder.row(InlineKeyboardButton(text="⬅️ Back", callback_data="menu:tools"))
+    return builder.as_markup()
+
+
+def script_detail_menu(name: str) -> InlineKeyboardMarkup:
+    return _kb(
+        [("▶️ Run", f"script:run:{name}")],
+        _back("tool:scripts"),
     )
 
 
@@ -408,9 +667,10 @@ def backup_menu() -> InlineKeyboardMarkup:
 
 def settings_menu() -> InlineKeyboardMarkup:
     return _kb(
-        [("🌐 Language", "settings:lang"), ("🔔 Alerts", "settings:alerts")],
-        [("🔌 Routers", "settings:routers"), ("👥 Bot Users", "settings:users")],
-        [("← Back", "menu:main")],
+        [("🔌 Routers",    "settings:routers"), ("👥 Bot Users",  "settings:users")],
+        [("🌐 Language",   "settings:lang"),    ("🐋 Containers", "container:list")],
+        [("📊 Bot Status", "qol:health_card"),  ("🔌 Conn Detail","qol:conn_detail")],
+        _back("menu:main"),
     )
 
 
@@ -429,7 +689,7 @@ def routers_menu(router_list: list[dict]) -> InlineKeyboardMarkup:
             callback_data=f"router:select:{alias}",
         ))
     builder.row(InlineKeyboardButton(text="➕ Add Router", callback_data="router:add"))
-    builder.row(InlineKeyboardButton(text="← Back", callback_data="menu:settings"))
+    builder.row(InlineKeyboardButton(text="⬅️ Back", callback_data="menu:settings"))
     return builder.as_markup()
 
 
@@ -437,7 +697,7 @@ def router_detail_menu(alias: str, is_active: bool) -> InlineKeyboardMarkup:
     rows = []
     if not is_active:
         rows.append([("⭐ Make Active", f"router:activate:{alias}")])
-    rows.append([("🗑 Remove", f"router:remove:{alias}"), ("← Back", "settings:routers")])
+    rows.append([("🗑 Remove", f"router:remove:{alias}"), ("⬅️ Back", "settings:routers")])
     return _kb(*rows)
 
 
@@ -453,15 +713,15 @@ def bot_users_menu(users: list[dict]) -> InlineKeyboardMarkup:
             callback_data=f"admin:user:{uid}",
         ))
     builder.row(InlineKeyboardButton(text="➕ Add User", callback_data="admin:add_user"))
-    builder.row(InlineKeyboardButton(text="← Back", callback_data="menu:settings"))
+    builder.row(InlineKeyboardButton(text="⬅️ Back", callback_data="menu:settings"))
     return builder.as_markup()
 
 
 def user_role_menu(uid: int) -> InlineKeyboardMarkup:
     return _kb(
         [("👁 Viewer", f"admin:setrole:{uid}:viewer"), ("⚙️ Operator", f"admin:setrole:{uid}:operator")],
-        [("🔑 Admin", f"admin:setrole:{uid}:admin")],
-        [("🗑 Remove User", f"admin:removeuser:{uid}"), ("← Back", "settings:users")],
+        [("🔑 Admin",  f"admin:setrole:{uid}:admin")],
+        [("🗑 Remove", f"admin:removeuser:{uid}"), ("⬅️ Back", "settings:users")],
     )
 
 
@@ -472,14 +732,12 @@ def wireguard_menu(interfaces: list[dict], peers: list[dict]) -> InlineKeyboardM
     for iface in interfaces:
         name = iface.get("name", "?")
         listen_port = iface.get("listen-port", "?")
-        pub_key = iface.get("public-key", "")[:20]
         builder.row(InlineKeyboardButton(text=f"🔒 {name} :{listen_port}", callback_data=f"wg:iface:{name}"))
     builder.row(InlineKeyboardButton(text=f"👥 Peers ({len(peers)})", callback_data="wg:peers"))
-    # Add peer button for first interface
     if interfaces:
         first_iface = interfaces[0].get("name", "")
         builder.row(InlineKeyboardButton(text="➕ Add Peer", callback_data=f"wg:add_peer:{first_iface}"))
-    builder.row(InlineKeyboardButton(text="← Back", callback_data="menu:vpn"))
+    builder.row(InlineKeyboardButton(text="⬅️ Back", callback_data="menu:vpn"))
     return builder.as_markup()
 
 
@@ -493,7 +751,7 @@ def wg_peers_list(peers: list[dict]) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text=f"👤 {comment} [{iface}]", callback_data=f"wg:peer:{id_}"),
             InlineKeyboardButton(text="🗑", callback_data=f"wg:remove:{id_}"),
         )
-    builder.row(InlineKeyboardButton(text="← Back", callback_data="vpn:wg"))
+    builder.row(InlineKeyboardButton(text="⬅️ Back", callback_data="vpn:wg"))
     return builder.as_markup()
 
 
@@ -510,7 +768,7 @@ def container_menu(containers: list[dict]) -> InlineKeyboardMarkup:
             text=f"{icon} {name} [{status}]",
             callback_data=f"container:detail:{id_}",
         ))
-    builder.row(InlineKeyboardButton(text="← Back", callback_data="menu:settings"))
+    builder.row(InlineKeyboardButton(text="⬅️ Back", callback_data="menu:extras"))
     return builder.as_markup()
 
 
@@ -518,227 +776,7 @@ def container_detail_menu(id_: str, running: bool) -> InlineKeyboardMarkup:
     action = ("⛔ Stop", f"container:stop:{id_}") if running else ("▶️ Start", f"container:start:{id_}")
     return _kb(
         [action, ("🗑 Remove", f"container:remove:{id_}")],
-        [("← Back", "container:list")],
-    )
-
-
-# ─── Confirm keyboard ─────────────────────────────────────────────────────────
-
-def confirm_keyboard(yes_cb: str, no_cb: str) -> InlineKeyboardMarkup:
-    return _kb(
-        [("✅ Confirm", yes_cb), ("❌ Cancel", no_cb)],
-    )
-
-
-def cancel_keyboard(back_cb: str = "menu:main") -> InlineKeyboardMarkup:
-    return _kb([("❌ Cancel", back_cb)])
-
-
-# ─── IP Management Menu ───────────────────────────────────────────────────────
-
-def ip_menu() -> InlineKeyboardMarkup:
-    return _kb(
-        [("📍 IP Addresses", "ip:list"), ("🔁 ARP Table", "ip:arp")],
-        [("🏊 IP Pools", "ip:pools"), ("📊 VLAN List", "vlan:list")],
-        [("← Back", "menu:main")],
-    )
-
-
-def ip_address_list_menu(addresses: list[dict]) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    for a in addresses:
-        addr = a.get("address", "?")
-        iface = a.get("interface", "?")
-        id_ = a.get(".id", "")
-        builder.row(InlineKeyboardButton(
-            text=f"📍 {addr} [{iface}]",
-            callback_data=f"ip:addr:detail:{id_}",
-        ))
-    builder.row(
-        InlineKeyboardButton(text="➕ Add", callback_data="ip:add_prompt"),
-        InlineKeyboardButton(text="🔄 Refresh", callback_data="ip:list"),
-        InlineKeyboardButton(text="← Back", callback_data="menu:ip"),
-    )
-    return builder.as_markup()
-
-
-def ip_addr_detail_menu(id_: str) -> InlineKeyboardMarkup:
-    return _kb(
-        [("🗑 Remove", f"ip:remove:{id_}")],
-        [("← Back", "ip:list")],
-    )
-
-
-def ip_pools_menu(pools: list[dict]) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    for p in pools:
-        name = p.get("name", "?")
-        ranges = p.get("ranges", "?")
-        id_ = p.get(".id", "")
-        builder.row(InlineKeyboardButton(
-            text=f"🏊 {name} ({ranges})",
-            callback_data=f"ip:pool:detail:{id_}",
-        ))
-    builder.row(
-        InlineKeyboardButton(text="➕ Add Pool", callback_data="ip:pool:add_prompt"),
-        InlineKeyboardButton(text="← Back", callback_data="menu:ip"),
-    )
-    return builder.as_markup()
-
-
-def ip_pool_detail_menu(id_: str) -> InlineKeyboardMarkup:
-    return _kb(
-        [("🗑 Remove", f"ip:pool:remove:{id_}")],
-        [("← Back", "ip:pools")],
-    )
-
-
-# ─── Queue / QoS Menu ────────────────────────────────────────────────────────
-
-def queues_menu(queues: list[dict]) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    for q in queues:
-        name = q.get("name", "?")
-        target = q.get("target", "?")
-        id_ = q.get(".id", "")
-        disabled = q.get("disabled", "false") == "true"
-        icon = "⛔" if disabled else "🟢"
-        builder.row(InlineKeyboardButton(
-            text=f"{icon} {name} → {target}",
-            callback_data=f"queue:detail:{id_}",
-        ))
-    builder.row(
-        InlineKeyboardButton(text="➕ Add Queue", callback_data="queue:add_prompt"),
-        InlineKeyboardButton(text="← Back", callback_data="menu:main"),
-    )
-    return builder.as_markup()
-
-
-def queue_detail_menu(id_: str, disabled: bool) -> InlineKeyboardMarkup:
-    toggle = ("✅ Enable", f"queue:enable:{id_}") if disabled else ("⛔ Disable", f"queue:disable:{id_}")
-    return _kb(
-        [toggle, ("🗑 Remove", f"queue:remove:{id_}")],
-        [("← Back", "menu:queues")],
-    )
-
-
-# ─── Hotspot Menu ─────────────────────────────────────────────────────────────
-
-def hotspot_menu() -> InlineKeyboardMarkup:
-    return _kb(
-        [("👥 Users", "hotspot:users"), ("🟢 Active Sessions", "hotspot:active")],
-        [("➕ Add User", "hotspot:add_prompt"), ("← Back", "menu:main")],
-    )
-
-
-def hotspot_users_menu(users: list[dict]) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    for u in users:
-        name = u.get("name", "?")
-        id_ = u.get(".id", "")
-        profile = u.get("profile", "default")
-        builder.row(InlineKeyboardButton(
-            text=f"👤 {name} [{profile}]",
-            callback_data=f"hotspot:user:{id_}",
-        ))
-    builder.row(
-        InlineKeyboardButton(text="← Back", callback_data="menu:hotspot"),
-    )
-    return builder.as_markup()
-
-
-def hotspot_user_detail_menu(id_: str) -> InlineKeyboardMarkup:
-    return _kb(
-        [("🗑 Remove", f"hotspot:remove:{id_}")],
-        [("← Back", "hotspot:users")],
-    )
-
-
-def hotspot_active_menu(sessions: list[dict]) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    for s in sessions:
-        name = s.get("user", "?")
-        ip = s.get("address", "?")
-        id_ = s.get(".id", "")
-        builder.row(InlineKeyboardButton(
-            text=f"🟢 {name} ({ip})",
-            callback_data=f"hotspot:kick:{id_}",
-        ))
-    builder.row(InlineKeyboardButton(text="← Back", callback_data="menu:hotspot"))
-    return builder.as_markup()
-
-
-# ─── Scripts Menu ─────────────────────────────────────────────────────────────
-
-def scripts_menu(scripts: list[dict]) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    for s in scripts:
-        name = s.get("name", "?")
-        builder.row(InlineKeyboardButton(
-            text=f"📜 {name}",
-            callback_data=f"script:detail:{name}",
-        ))
-    builder.row(
-        InlineKeyboardButton(text="← Back", callback_data="menu:main"),
-    )
-    return builder.as_markup()
-
-
-def script_detail_menu(name: str) -> InlineKeyboardMarkup:
-    return _kb(
-        [("▶️ Run", f"script:run:{name}")],
-        [("← Back", "menu:scripts")],
-    )
-
-
-# ─── Bridge / VLAN Menu ───────────────────────────────────────────────────────
-
-def bridge_menu(bridges: list[dict]) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    for b in bridges:
-        name = b.get("name", "?")
-        running = b.get("running", "false") == "true"
-        icon = "🟢" if running else "🔴"
-        builder.row(InlineKeyboardButton(
-            text=f"{icon} Bridge: {name}",
-            callback_data=f"bridge:detail:{name}",
-        ))
-    builder.row(
-        InlineKeyboardButton(text="🌐 VLANs", callback_data="vlan:list"),
-        InlineKeyboardButton(text="← Back", callback_data="menu:main"),
-    )
-    return builder.as_markup()
-
-
-def bridge_detail_menu(name: str) -> InlineKeyboardMarkup:
-    return _kb(
-        [("🔌 Ports", f"bridge:ports:{name}")],
-        [("← Back", "menu:bridge")],
-    )
-
-
-def vlan_list_menu(vlans: list[dict]) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    for v in vlans:
-        name = v.get("name", "?")
-        vid = v.get("vlan-id", "?")
-        iface = v.get("interface", "?")
-        id_ = v.get(".id", "")
-        builder.row(InlineKeyboardButton(
-            text=f"🏷 VLAN {vid}: {name} [{iface}]",
-            callback_data=f"vlan:detail:{id_}",
-        ))
-    builder.row(
-        InlineKeyboardButton(text="➕ Add VLAN", callback_data="vlan:add_prompt"),
-        InlineKeyboardButton(text="← Back", callback_data="menu:bridge"),
-    )
-    return builder.as_markup()
-
-
-def vlan_detail_menu(id_: str) -> InlineKeyboardMarkup:
-    return _kb(
-        [("🗑 Remove", f"vlan:remove:{id_}")],
-        [("← Back", "vlan:list")],
+        _back("container:list"),
     )
 
 
@@ -767,7 +805,7 @@ def mangle_rule_list(rules: list[dict], page: int = 0) -> InlineKeyboardMarkup:
         builder.row(*[InlineKeyboardButton(text=t, callback_data=d) for t, d in nav])
     builder.row(
         InlineKeyboardButton(text="➕ Add", callback_data="mangle:add_prompt"),
-        InlineKeyboardButton(text="← Back", callback_data="menu:firewall"),
+        InlineKeyboardButton(text="⬅️ Back", callback_data="menu:firewall"),
     )
     return builder.as_markup()
 
@@ -775,7 +813,7 @@ def mangle_rule_list(rules: list[dict], page: int = 0) -> InlineKeyboardMarkup:
 def mangle_detail_menu(id_: str) -> InlineKeyboardMarkup:
     return _kb(
         [("🗑 Remove", f"mangle:remove:{id_}")],
-        [("← Back", "fw:mangle")],
+        _back("fw:mangle"),
     )
 
 
@@ -804,7 +842,7 @@ def nat_add_action_menu(chain: str) -> InlineKeyboardMarkup:
 def nat_rule_detail_menu(id_: str) -> InlineKeyboardMarkup:
     return _kb(
         [("🗑 Remove", f"nat:remove:{id_}")],
-        [("← Back", "fw:nat")],
+        _back("fw:nat"),
     )
 
 
@@ -813,7 +851,7 @@ def nat_rule_detail_menu(id_: str) -> InlineKeyboardMarkup:
 def ntp_menu() -> InlineKeyboardMarkup:
     return _kb(
         [("📋 View NTP", "ntp:view"), ("✏️ Set Servers", "ntp:set_prompt")],
-        [("← Back", "menu:system")],
+        _back("menu:system"),
     )
 
 
@@ -828,7 +866,7 @@ def certs_menu(certs: list[dict]) -> InlineKeyboardMarkup:
             text=f"🔐 {name} (exp: {expires})",
             callback_data=f"cert:detail:{name}",
         ))
-    builder.row(InlineKeyboardButton(text="← Back", callback_data="menu:system"))
+    builder.row(InlineKeyboardButton(text="⬅️ Back", callback_data="menu:system"))
     return builder.as_markup()
 
 
@@ -836,16 +874,15 @@ def certs_menu(certs: list[dict]) -> InlineKeyboardMarkup:
 
 def arp_menu() -> InlineKeyboardMarkup:
     return _kb(
-        [("🔄 Refresh", "ip:arp"), ("← Back", "menu:ip")],
+        [("🔄 Refresh", "ip:arp"), ("⬅️ Back", "menu:network")],
     )
 
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+# ─── Confirm / Cancel ─────────────────────────────────────────────────────────
 
-def _fmt_size(size_bytes: int) -> str:
-    if size_bytes < 1024:
-        return f"{size_bytes}B"
-    elif size_bytes < 1024 ** 2:
-        return f"{size_bytes // 1024}KB"
-    else:
-        return f"{size_bytes // 1024 ** 2}MB"
+def confirm_keyboard(yes_cb: str, no_cb: str) -> InlineKeyboardMarkup:
+    return _kb([(("✅ Confirm", yes_cb)), ("❌ Cancel", no_cb)])
+
+
+def cancel_keyboard(back_cb: str = "menu:main") -> InlineKeyboardMarkup:
+    return _kb([("❌ Cancel", back_cb)])

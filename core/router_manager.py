@@ -21,6 +21,7 @@ from .router_ros6 import RouterROS6
 from .router_ros7 import RouterROS7
 from .mock_router import MockRouter
 from .router_base import RouterBase
+from . import crypto
 
 log = logging.getLogger("RouterManager")
 
@@ -57,7 +58,7 @@ class RouterEntry:
             "alias": self.alias,
             "host": self.host,
             "username": self.username,
-            "password": self.password,
+            "password": crypto.ensure_encrypted(self.password),
             "port": self.port,
             "use_ssl": self.use_ssl,
             "ros_version": self.ros_version,
@@ -67,6 +68,8 @@ class RouterEntry:
 
     @classmethod
     def from_dict(cls, d: dict) -> "RouterEntry":
+        d = dict(d)  # don't mutate the source
+        d["password"] = crypto.safe_decrypt(d.get("password", ""))
         return cls(**d)
 
 
@@ -80,6 +83,8 @@ class RouterManager:
         self._active: dict[int, str] = {}
         # Serialises registry writes to prevent concurrent write corruption
         self._write_lock = asyncio.Lock()
+        # Optional Monitor reference — set via set_monitor()
+        self._monitor = None
         # Synchronous load only during __init__ (before the event loop starts)
         self._load_registry_sync()
 
@@ -176,6 +181,9 @@ class RouterManager:
         if self._active.get(user_id) == alias:
             remaining = list(self._entries.get(user_id, {}).keys())
             self._active[user_id] = remaining[0] if remaining else None
+        # Notify monitor to clean up alert state cache
+        if self._monitor:
+            self._monitor.on_router_removed(user_id, alias)
         await self._save_registry()
         return True
 
