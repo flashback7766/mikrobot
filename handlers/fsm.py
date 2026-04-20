@@ -11,6 +11,9 @@ from ui import keyboards as kb
 from ui import formatters as fmt
 from ui.i18n import t, get_lang
 
+import logging
+log = logging.getLogger("FSM")
+
 router = Router()
 
 
@@ -61,6 +64,8 @@ async def _handle_fsm(msg: Message, uid: int, state: str, text: str):
 
     elif state == "add_router:port":
         d = ctx.sessions.get_data(uid)
+        alias = d["alias"]  # save before clear_state wipes it
+        host = d["host"]
         port = 8728
         use_ssl = False
         if text != "-":
@@ -73,8 +78,8 @@ async def _handle_fsm(msg: Message, uid: int, state: str, text: str):
         await msg.answer(t("fsm.router.connecting", lang), parse_mode="Markdown")
         ok, result = await ctx.rm.add_router(
             user_id=uid,
-            alias=d["alias"],
-            host=d["host"],
+            alias=alias,
+            host=host,
             username=d["username"],
             password=d["password"],
             port=port,
@@ -82,7 +87,25 @@ async def _handle_fsm(msg: Message, uid: int, state: str, text: str):
         )
         ctx.sessions.clear_state(uid)
         if ok:
-            log_admin(uid, "router_add", f"{d['alias']}@{d['host']}")
+            log_admin(uid, "router_add", f"{alias}@{host}")
+            # Auto-enable DHCP Guard detector for the new router.
+            # Firewall rules stay OFF until the user explicitly opts in,
+            # since they can interfere with existing firewall setups.
+            if ctx.guard_store is not None:
+                try:
+                    await ctx.guard_store.update(uid, alias, enabled=True)
+                    result += (
+                        "\n\n🛡 *DHCP Guard detector auto-enabled*\n"
+                        "You'll be alerted if a DHCP starvation attack is detected.\n"
+                        "Optionally, apply firewall rate-limit rules now:"
+                    )
+                    await msg.answer(
+                        result, parse_mode="Markdown",
+                        reply_markup=kb.post_add_router(),
+                    )
+                    return
+                except Exception as e:
+                    log.warning(f"Auto-enable DHCP Guard failed: {e}")
         await msg.answer(result, parse_mode="Markdown", reply_markup=kb.main_menu())
 
     # ── Firewall Add Rule FSM ───────────────────────────────────────────────

@@ -26,6 +26,7 @@ from core.session import SessionManager
 from core.monitor import Monitor
 from core.watchdog import Watchdog
 from core.healthcheck import HealthServer
+from core.dhcp_guard import GuardSettingsStore, DhcpAttackDetector
 import handlers
 
 # ─── Logging ─────────────────────────────────────────────────────────────────
@@ -50,6 +51,9 @@ crypto.init(BOT_TOKEN)
 rm = RouterManager()
 rbac = RBACManager()
 sessions = SessionManager()
+# DHCP Guard — detector (in-memory) + settings store (JSON persisted)
+guard_store = GuardSettingsStore()
+guard_detector = DhcpAttackDetector()
 
 
 # ─── Startup / Shutdown Notifications ─────────────────────────────────────────
@@ -78,13 +82,13 @@ async def main():
     )
 
     # Inject dependencies and wire all handler sub-routers
-    handlers.setup(rm, rbac, sessions, bot)
+    handlers.setup(rm, rbac, sessions, bot, guard_store, guard_detector)
 
     dp = Dispatcher()
     dp.include_router(handlers.parent_router)
 
     # Start background services
-    monitor = Monitor(rm, bot, OWNER_ID or 0)
+    monitor = Monitor(rm, bot, OWNER_ID or 0, guard_store, guard_detector)
     rm._monitor = monitor  # Wire cleanup hook
     watchdog = Watchdog(rm)
     await monitor.start()

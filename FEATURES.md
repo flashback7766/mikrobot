@@ -112,6 +112,19 @@ All features accessible via Telegram with role-based permissions.
 - ✅ Remove lease
 - ✅ Lease detail (MAC, IP, hostname, server)
 
+### DHCP Guard 🆕
+- ✅ **Sliding-window starvation attack detector** (dhcpig, Yersinia, etc.)
+- ✅ Auto-enabled on every router you add — zero config needed
+- ✅ Telegram alerts with sample MACs of flooders
+- ✅ **Firewall rate-limit** (opt-in, one tap): UDP/67 rate,burst packet limit
+- ✅ Idempotent firewall rules (tagged via comment, safe to re-apply/remove)
+- ✅ Rules automatically moved to top of input chain
+- ✅ **Auto-purge** mode: removes dynamic leases of flooding MACs
+- ✅ Three thresholds presets (Strict / Balanced / Lax)
+- ✅ Per-router independent state
+- ✅ 5-minute alert cooldown prevents notification spam
+- ✅ Persisted settings in `data/dhcp_guard.json`
+
 ---
 
 ## 📶 Wireless
@@ -313,6 +326,7 @@ All features accessible via Telegram with role-based permissions.
 - ✅ **Background monitor** for alerts
 - ✅ CPU/memory threshold alerts
 - ✅ Connection state notifications
+- ✅ **DHCP starvation attack alerts** 🆕
 
 ### Standalone Mode (ROS7)
 - ✅ Run bot **inside router** Docker container

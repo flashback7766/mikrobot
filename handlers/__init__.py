@@ -21,6 +21,7 @@ from handlers.system import router as system_router
 from handlers.interfaces import router as interfaces_router
 from handlers.firewall import router as firewall_router
 from handlers.dhcp import router as dhcp_router
+from handlers.dhcp_guard import router as dhcp_guard_router
 from handlers.wireless import router as wireless_router
 from handlers.vpn import router as vpn_router
 from handlers.files import router as files_router
@@ -36,9 +37,19 @@ from handlers.qol import router as qol_router
 parent_router = Router(name="main")
 
 
-def setup(router_manager, rbac_manager, session_manager, bot_instance):
+def setup(
+    router_manager,
+    rbac_manager,
+    session_manager,
+    bot_instance,
+    guard_store=None,
+    guard_detector=None,
+):
     """Inject dependencies and wire sub-routers."""
-    context.init(router_manager, rbac_manager, session_manager, bot_instance)
+    context.init(
+        router_manager, rbac_manager, session_manager, bot_instance,
+        guard_store, guard_detector,
+    )
 
     # Middleware stack (execution order: first registered → runs first)
     # 1. Error handler — outermost, catches everything
@@ -56,6 +67,7 @@ def setup(router_manager, rbac_manager, session_manager, bot_instance):
     parent_router.include_router(interfaces_router)
     parent_router.include_router(firewall_router)
     parent_router.include_router(dhcp_router)
+    parent_router.include_router(dhcp_guard_router)
     parent_router.include_router(wireless_router)
     parent_router.include_router(vpn_router)
     parent_router.include_router(files_router)

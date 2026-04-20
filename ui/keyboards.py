@@ -210,7 +210,39 @@ def dhcp_menu() -> InlineKeyboardMarkup:
     return _kb(
         [("📋 Leases", "dhcp:leases"),    ("🖥 Servers", "dhcp:servers")],
         [("➕ Add Static Lease", "dhcp:add_static")],
+        [("🛡 DHCP Guard", "dhcpg:menu")],
         _back("menu:main"),
+    )
+
+
+def dhcp_guard_menu(s) -> InlineKeyboardMarkup:
+    """DHCP Guard main menu. `s` is a GuardSettings instance."""
+    det_btn = "🟢 Detector: ON" if s.enabled else "⚪️ Detector: OFF"
+    fw_apply_label = "🛡 Re-apply Firewall" if s.firewall_applied else "🛡 Apply Firewall"
+    ap_btn = "🔨 Auto-purge: ON" if s.auto_purge_flooders else "🔨 Auto-purge: OFF"
+    return _kb(
+        [(det_btn, "dhcpg:detector:toggle")],
+        [(fw_apply_label, "dhcpg:fw:apply"), ("🗑 Remove FW", "dhcpg:fw:remove")],
+        [("⚙️ Thresholds", "dhcpg:thresholds")],
+        [(ap_btn, "dhcpg:autopurge:toggle")],
+        _back("menu:dhcp"),
+    )
+
+
+def dhcp_guard_thresholds() -> InlineKeyboardMarkup:
+    return _kb(
+        [("🔴 Strict — 10 new / 60s", "dhcpg:preset:strict")],
+        [("🟡 Balanced — 20 new / 60s", "dhcpg:preset:balanced")],
+        [("🟢 Lax — 50 new / 120s", "dhcpg:preset:lax")],
+        _back("dhcpg:menu"),
+    )
+
+
+def post_add_router() -> InlineKeyboardMarkup:
+    """Shown right after /add_router succeeds — offer to apply firewall guard."""
+    return _kb(
+        [("🛡 Apply DHCP Guard Firewall", "dhcpg:quicksetup")],
+        [("📋 Main Menu", "menu:main")],
     )
 
 

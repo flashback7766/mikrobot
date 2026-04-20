@@ -10,6 +10,7 @@ Full RouterOS management bot. Every feature of WinBox, available in your Telegra
 | **Interfaces** | List, enable/disable, live traffic stats, ethernet statistics |
 | **Firewall** | Filter rules (CRUD, move, enable/disable), NAT, Mangle, Address Lists, Connection Tracking, Quick Block IP |
 | **DHCP** | Leases (view, make static, remove), servers, add static leases |
+| **DHCP Guard** 🆕 | DHCP starvation (`dhcpig` etc.) detection + firewall rate-limit + optional auto-purge of flood leases |
 | **Wireless** | Interface control, connected clients, SSID/password change, disconnect client, AP scan |
 | **VPN** | PPPoE active sessions, L2TP/OpenVPN/PPTP status, PPP secrets (CRUD), WireGuard (ROS7) |
 | **File System** | Browse, download, delete router files |
@@ -24,7 +25,7 @@ Full RouterOS management bot. Every feature of WinBox, available in your Telegra
 | **Containers** | Docker container management (ROS7 only) |
 | **RBAC** | owner / admin / operator / viewer roles with per-command permissions |
 | **Multi-router** | Multiple routers per user, switch between them |
-| **Alerts** | CPU/memory threshold alerts, interface down, new device detection |
+| **Alerts** | CPU/memory threshold alerts, interface down, new device detection, DHCP attack alerts 🆕 |
 | **Auto-reconnect** | Watchdog reconnects dropped router connections |
 | **Security** | 🔐 Router passwords encrypted at rest (Fernet/PBKDF2) |
 
@@ -195,3 +196,36 @@ Full WinBox-equivalent firewall control:
 - Quick block: tap **🚫 Quick Block IP** → enter IP → automatically adds to blacklist + drop rule
 - View and manage address lists
 - View active connection tracking table
+
+## 🛡 DHCP Guard
+
+Protection against DHCP starvation attacks (`dhcpig`, `Yersinia`, and similar tools that exhaust the DHCP pool by sending forged DHCPDISCOVER packets with random MAC addresses).
+
+**Two-layer defence:**
+
+- **Detector** (auto-enabled on every router you add): polls the lease table every 30s and alerts your Telegram chat the moment new-lease velocity crosses the configured threshold.
+- **Firewall rate-limit** (opt-in, one tap after adding a router): installs two input-chain rules on UDP/67 — accept up to `rate,burst:packet`, drop the overflow. All rules tagged with `comment="mikrobot-dhcp-guard"` for clean idempotent apply/remove.
+
+**Optional auto-mitigation:** toggle on to have the bot remove dynamic leases belonging to the flooding MACs. Static leases are never touched.
+
+**Presets** (configurable under 📡 DHCP → 🛡 DHCP Guard → ⚙️ Thresholds):
+
+| Preset | New leases in window triggers alert | Firewall rate,burst |
+|---|---|---|
+| 🔴 Strict | 10 in 60s | 20,50 |
+| 🟡 Balanced (default) | 20 in 60s | 50,100 |
+| 🟢 Lax | 50 in 120s | 100,200 |
+
+**Sample alert:**
+```
+🚨 DHCP STARVATION ATTACK
+Router: home (192.168.1.1)
+New leases: 127 in 60s
+Total leases now: 135
+Sample MACs:
+  DE:AD:BE:EF:00:04
+  DE:AD:BE:EF:00:12
+  ... and 122 more
+```
+
+5-minute cooldown between alerts for the same router prevents alert storms.

@@ -20,6 +20,11 @@ from typing import Optional
 from aiogram import Bot
 
 from .router_manager import RouterManager
+from .dhcp_guard import (
+    GuardSettingsStore,
+    DhcpAttackDetector,
+    purge_flood_leases,
+)
 
 log = logging.getLogger("Monitor")
 
@@ -41,10 +46,20 @@ class AlertState:
 
 class Monitor:
 
-    def __init__(self, router_manager: RouterManager, bot: Bot, owner_id: int):
+    def __init__(
+        self,
+        router_manager: RouterManager,
+        bot: Bot,
+        owner_id: int,
+        guard_store: Optional[GuardSettingsStore] = None,
+        guard_detector: Optional[DhcpAttackDetector] = None,
+    ):
         self.rm = router_manager
         self.bot = bot
         self.owner_id = owner_id
+        # DHCP Guard (optional; if None, guard features are inactive)
+        self.guard_store = guard_store
+        self.guard_detector = guard_detector
         # Key: (user_id, alias) — one AlertState per router, not per user
         self._alert_states: dict[tuple[int, str], AlertState] = {}
         self._running = False
@@ -73,6 +88,12 @@ class Monitor:
             self.last_status[user_id].pop(alias, None)
             if not self.last_status[user_id]:
                 del self.last_status[user_id]
+        # Also clean up DHCP Guard state
+        if self.guard_detector:
+            self.guard_detector.reset(user_id, alias)
+        if self.guard_store:
+            # Fire-and-forget; removal from store is async
+            asyncio.create_task(self.guard_store.remove(user_id, alias))
 
     async def _loop(self) -> None:
         while self._running:
@@ -177,6 +198,40 @@ class Monitor:
                 state.last_seen_macs = macs
             except Exception:
                 pass
+
+        # ── DHCP Guard: starvation attack detection ─────────────────────────
+        if (
+            self.guard_store is not None
+            and self.guard_detector is not None
+            and isinstance(leases, list)
+        ):
+            try:
+                settings = self.guard_store.get(user_id, alias)
+                report = self.guard_detector.update(user_id, alias, leases, settings)
+                if report is not None:
+                    await self._handle_dhcp_attack(
+                        user_id, alias, router, host, settings, report
+                    )
+            except Exception as e:
+                log.warning(f"DHCP Guard detector error for {alias}: {e}")
+
+    async def _handle_dhcp_attack(
+        self, user_id: int, alias: str, router, host: str,
+        settings, report
+    ) -> None:
+        """Alert user + run opt-in auto-mitigation."""
+        await self._send_alert(user_id, report.format_alert(alias, host))
+
+        if settings.auto_purge_flooders:
+            try:
+                removed = await purge_flood_leases(router, report.sample_macs)
+                if removed:
+                    await self._send_alert(
+                        user_id,
+                        f"🔨 *{alias}* auto-mitigation: purged *{removed}* flooder lease(s)"
+                    )
+            except Exception as e:
+                log.warning(f"Auto-purge failed for {alias}: {e}")
 
     async def _send_alert(self, user_id: int, text: str) -> None:
         try:

@@ -18,6 +18,7 @@ from aiogram.exceptions import TelegramBadRequest
 from core.router_manager import RouterManager
 from core.rbac import RBACManager
 from core.session import SessionManager
+from core.dhcp_guard import GuardSettingsStore, DhcpAttackDetector
 
 log = logging.getLogger("Handlers")
 
@@ -27,17 +28,28 @@ rm: RouterManager = None
 rbac: RBACManager = None
 sessions: SessionManager = None
 bot = None
+# DHCP Guard (optional — None until init() is called with them)
+guard_store: GuardSettingsStore = None
+guard_detector: DhcpAttackDetector = None
 _start_time: float = 0.0
 
 
-def init(router_manager: RouterManager, rbac_manager: RBACManager,
-         session_manager: SessionManager, bot_instance):
+def init(
+    router_manager: RouterManager,
+    rbac_manager: RBACManager,
+    session_manager: SessionManager,
+    bot_instance,
+    guard_store_: GuardSettingsStore = None,
+    guard_detector_: DhcpAttackDetector = None,
+):
     """Called once from bot.py at startup to inject dependencies."""
-    global rm, rbac, sessions, bot, _start_time
+    global rm, rbac, sessions, bot, guard_store, guard_detector, _start_time
     rm = router_manager
     rbac = rbac_manager
     sessions = session_manager
     bot = bot_instance
+    guard_store = guard_store_
+    guard_detector = guard_detector_
     _start_time = time.time()
 
 

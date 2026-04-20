@@ -88,6 +88,10 @@ PERMISSIONS: dict[str, Role] = {
     "dhcp.view": Role.VIEWER,
     "dhcp.manage": Role.OPERATOR,
 
+    # DHCP Guard (starvation protection)
+    "dhcp.guard.view": Role.VIEWER,
+    "dhcp.guard.manage": Role.OPERATOR,
+
     # Wireless
     "wireless.view": Role.VIEWER,
     "wireless.manage": Role.OPERATOR,
